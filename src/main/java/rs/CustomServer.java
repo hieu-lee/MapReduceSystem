@@ -8,7 +8,6 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -154,30 +153,26 @@ public class CustomServer {
         }
     }
 
-    private List<Integer> getBoundaries(Map<String, Integer> aWordCounts, Socket aClientSocket) {
+    private Integer[] getBoundaries(Map<String, Integer> aWordCounts, Socket aClientSocket) {
         Map<Integer, Integer> myFreqCounts = new HashMap<>();
         for (Map.Entry<String, Integer> aEntry : aWordCounts.entrySet()) {
             myFreqCounts.put(aEntry.getValue(), myFreqCounts.getOrDefault(aEntry.getValue(), 0) + 1);
         }
-        List<String> myFreqCountStrings = new ArrayList<>();
+        StringBuilder myFreqCountString = new StringBuilder();
         for (Map.Entry<Integer, Integer> aEntry : myFreqCounts.entrySet()) {
-            myFreqCountStrings.add(aEntry.getKey() + "-" + aEntry.getValue());
+            myFreqCountString.append(aEntry.getKey()).append("-").append(aEntry.getValue()).append(" ");
         }
-        SocketUtils.write(aClientSocket, String.join(" ", myFreqCountStrings));
+        SocketUtils.write(aClientSocket, myFreqCountString.toString().trim());
         String myMessage = SocketUtils.read(aClientSocket);
         List<Integer> myBoundaries = new ArrayList<>();
-        String[] myMessageParts = myMessage.split(" ");
-        for (String myMessagePart : myMessageParts) {
-            myBoundaries.add(Integer.parseInt(myMessagePart));
-        }
         System.out.println("Boundaries done");
-        return myBoundaries;
+        return Arrays.stream(myMessage.split(" ")).map(Integer::parseInt).toArray(Integer[]::new);
     }
 
-    private int getServerIndex(int aFreq, List<Integer> aBoundaries) {
+    private int getServerIndex(int aFreq, Integer[] aBoundaries) {
         int myServerIndex = 0;
-        for (int i = 0; i < aBoundaries.size(); i++) {
-            if (aFreq <= aBoundaries.get(i)) {
+        for (int i = 0; i < aBoundaries.length; i++) {
+            if (aFreq <= aBoundaries[i]) {
                 myServerIndex = i;
                 break;
             }
@@ -185,7 +180,7 @@ public class CustomServer {
         return myServerIndex;
     }
 
-    private void shufflePhase2(Map<String, Integer> aWordCounts, String[] aServerNames, Socket aClientSocket, List<Integer> aBoundaries, StringBuilder[] aTokensList) {
+    private void shufflePhase2(Map<String, Integer> aWordCounts, String[] aServerNames, Socket aClientSocket, Integer[] aBoundaries, StringBuilder[] aTokensList) {
         CustomFTPClient[] myClients = new CustomFTPClient[theNumberOfServers];
 
         for (int i = 0; i < theNumberOfServers; i++) {
@@ -214,7 +209,7 @@ public class CustomServer {
             }
         }
         SocketUtils.write(aClientSocket, "shuffle 2 done");
-        System.out.println("Shuff::le 2 done");
+        System.out.println("Shuffle 2 done");
     }
 
     private void reducePhase2(Socket aClientSocket, StringBuilder[] aTokensList, String[] aServerNames) {
@@ -229,41 +224,40 @@ public class CustomServer {
             throw new RuntimeException("Invalid command");
         }
 
-        List<Map.Entry<Integer, String>> myWordsList = IntStream.range(0, theNumberOfServers)
-                .mapToObj(i -> {
-                    try {
-                        return !theServerName.equals(aServerNames[i]) ?
-                                Files.lines(Paths.get(theCustomFTPServer.getHomeDirectory() + "/" + aServerNames[i] + THE_REDUCE_FILE_SUFFIX))
-                                        .flatMap(aLine -> Arrays.stream(aLine.split("\n")))
-                                        .filter(aWord -> !aWord.isEmpty())
-                                        .map(aWord -> {
-                                            String[] tokens = aWord.split(" ");
-                                            return new AbstractMap.SimpleEntry<>(Integer.parseInt(tokens[0]), tokens[1]);
-                                        })
-                                : Arrays.stream(aTokensList[i].toString().split("\n"))
-                                .filter(aWord -> !aWord.isEmpty())
-                                .map(aWord -> {
-                                    String[] aTokens = aWord.split(" ");
-                                    return new AbstractMap.SimpleEntry<>(Integer.parseInt(aTokens[0]), aTokens[1]);
-                                });
-                    } catch (IOException aE) {
-                        aE.printStackTrace();
-                        return Stream.<Map.Entry<Integer, String>>empty();
-                    }
-                })
-                .flatMap(Function.identity())
-                .sorted(Comparator.comparingInt((Map.Entry<Integer, String> entry) -> entry.getKey())
-                        .thenComparing(Map.Entry::getValue))
-                .collect(Collectors.toList());
-
-
-        StringBuilder myOutput = new StringBuilder();
-        for (Map.Entry<Integer, String> aWord : myWordsList) {
-            myOutput.append(aWord.getKey()).append(" ").append(aWord.getValue()).append("\n");
-        }
-
-        try {
-            Files.write(Paths.get(theCustomFTPServer.getHomeDirectory() + "/output.txt"), myOutput.toString().getBytes());
+        try (BufferedWriter myWriter = Files.newBufferedWriter(Paths.get(theCustomFTPServer.getHomeDirectory() + "/output.txt"))) {
+            IntStream.range(0, theNumberOfServers)
+                    .mapToObj(i -> {
+                        try {
+                            return !theServerName.equals(aServerNames[i]) ?
+                                    Files.lines(Paths.get(theCustomFTPServer.getHomeDirectory() + "/" + aServerNames[i] + THE_REDUCE_FILE_SUFFIX))
+                                            .flatMap(aLine -> Arrays.stream(aLine.split("\n")))
+                                            .filter(aWord -> !aWord.isEmpty())
+                                            .map(aWord -> {
+                                                String[] tokens = aWord.split(" ");
+                                                return new AbstractMap.SimpleEntry<>(Integer.parseInt(tokens[0]), tokens[1]);
+                                            })
+                                    : Arrays.stream(aTokensList[i].toString().split("\n"))
+                                    .filter(aWord -> !aWord.isEmpty())
+                                    .map(aWord -> {
+                                        String[] aTokens = aWord.split(" ");
+                                        return new AbstractMap.SimpleEntry<>(Integer.parseInt(aTokens[0]), aTokens[1]);
+                                    });
+                        } catch (IOException aE) {
+                            aE.printStackTrace();
+                            return Stream.<Map.Entry<Integer, String>>empty();
+                        }
+                    })
+                    .flatMap(Function.identity())
+                    .sorted(Comparator.comparingInt((Map.Entry<Integer, String> aEntry) -> aEntry.getKey())
+                            .thenComparing(Map.Entry::getValue))
+                    .forEachOrdered(aEntry -> {
+                        try {
+                            myWriter.write(aEntry.getKey() + " " + aEntry.getValue());
+                            myWriter.newLine();
+                        } catch (IOException aE) {
+                            aE.printStackTrace();
+                        }
+                    });
             SocketUtils.write(aClientSocket, "reduce 2 done");
             System.out.println("Reduce 2 done");
         } catch (IOException aE) {
