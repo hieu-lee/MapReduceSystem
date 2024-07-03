@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -59,9 +60,10 @@ public class CustomClient {
 
             for (String aFilename : theInputFilenames) {
                 File myFile = new File(THE_INPUT_FILES_DIRECTORY + "/" + aFilename);
+                AtomicInteger myCount = new AtomicInteger(0);
                 try (Stream<String> myLinesStream = Files.lines(myFile.toPath())) {
                     myLinesStream.forEach(aLine -> {
-                        int myServerIndex = Math.abs(aLine.hashCode()) % theNumberOfServers;
+                        int myServerIndex = myCount.getAndIncrement() % theNumberOfServers;
                         try {
                             myBufferedWriters[myServerIndex].write(aLine.toLowerCase() + "\n");
                         } catch (IOException aE) {
