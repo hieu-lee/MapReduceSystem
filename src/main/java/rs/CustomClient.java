@@ -169,13 +169,16 @@ public class CustomClient {
     private List<Integer> getBoundaries(Socket[] aClientSockets) {
         Map<Integer, Integer> myWordFreqCounter = new HashMap<>();
         for (int i = 0; i < theNumberOfServers; i++) {
-            String myOutput = SocketUtils.read(aClientSockets[i]);
-            String[] myEntryStrings = myOutput.split(" ");
-            for (String aEntryString : myEntryStrings) {
-                String[] myEntryString = aEntryString.split("-");
+            int myCount = 0;
+            String myMessage = SocketUtils.read(aClientSockets[i]);
+            while (!myMessage.equals("boundaries done")) {
+                myCount++;
+                String[] myEntryString = myMessage.split("-");
                 int myKey = Integer.parseInt(myEntryString[0]);
                 int myValue = Integer.parseInt(myEntryString[1]);
                 myWordFreqCounter.put(myKey, myWordFreqCounter.getOrDefault(myKey, 0) + myValue);
+                SocketUtils.write(aClientSockets[i], String.valueOf(myCount));
+                myMessage = SocketUtils.read(aClientSockets[i]);
             }
         }
         int myTotalFreqCount = myWordFreqCounter.values().stream().mapToInt(i -> i).sum();

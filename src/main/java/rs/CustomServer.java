@@ -153,23 +153,24 @@ public class CustomServer {
         }
     }
 
-    private Integer[] getBoundaries(Map<String, Integer> aWordCounts, Socket aClientSocket) {
+    private int[] getBoundaries(Map<String, Integer> aWordCounts, Socket aClientSocket) {
         Map<Integer, Integer> myFreqCounts = new HashMap<>();
-        for (Map.Entry<String, Integer> aEntry : aWordCounts.entrySet()) {
-            myFreqCounts.put(aEntry.getValue(), myFreqCounts.getOrDefault(aEntry.getValue(), 0) + 1);
+        for (Integer aCount : aWordCounts.values()) {
+            myFreqCounts.merge(aCount, 1, Integer::sum);
         }
-        StringBuilder myFreqCountString = new StringBuilder();
+        String myLastReplyString = String.valueOf(myFreqCounts.size());
         for (Map.Entry<Integer, Integer> aEntry : myFreqCounts.entrySet()) {
-            myFreqCountString.append(aEntry.getKey()).append("-").append(aEntry.getValue()).append(" ");
+            SocketUtils.write(aClientSocket, aEntry.getKey() + "-" + aEntry.getValue());
         }
-        SocketUtils.write(aClientSocket, myFreqCountString.toString().trim());
+        while (!SocketUtils.read(aClientSocket).equals(myLastReplyString)) {}
+        SocketUtils.write(aClientSocket, "boundaries done");
         String myMessage = SocketUtils.read(aClientSocket);
-        List<Integer> myBoundaries = new ArrayList<>();
         System.out.println("Boundaries done");
-        return Arrays.stream(myMessage.split(" ")).map(Integer::parseInt).toArray(Integer[]::new);
+        return Arrays.stream(myMessage.split(" ")).mapToInt(Integer::parseInt).toArray();
     }
 
-    private int getServerIndex(int aFreq, Integer[] aBoundaries) {
+
+    private int getServerIndex(int aFreq, int[] aBoundaries) {
         int myServerIndex = 0;
         for (int i = 0; i < aBoundaries.length; i++) {
             if (aFreq <= aBoundaries[i]) {
@@ -180,7 +181,7 @@ public class CustomServer {
         return myServerIndex;
     }
 
-    private void shufflePhase2(Map<String, Integer> aWordCounts, String[] aServerNames, Socket aClientSocket, Integer[] aBoundaries, StringBuilder[] aTokensList) {
+    private void shufflePhase2(Map<String, Integer> aWordCounts, String[] aServerNames, Socket aClientSocket, int[] aBoundaries, StringBuilder[] aTokensList) {
         CustomFTPClient[] myClients = new CustomFTPClient[theNumberOfServers];
 
         for (int i = 0; i < theNumberOfServers; i++) {
