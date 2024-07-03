@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
@@ -83,15 +84,15 @@ public class CustomServer {
         for (int i = 0; i < theNumberOfServers; i++) {
             myTokens[i] = new StringBuilder();
         }
-        try {
-            try (Stream<String> aLines = Files.lines(Paths.get(theCustomFTPServer.getHomeDirectory(), "input.txt"))) {
-                aLines.flatMap(this::getWords)
-                    .forEach(aWord -> {
-                        int myServerIndex = (aWord.hashCode() % theNumberOfServers + theNumberOfServers) % theNumberOfServers;
-                        myTokens[myServerIndex].append(aWord).append(" ").append(1).append("\n");
-                    });
+        Path filePath = Paths.get(theCustomFTPServer.getHomeDirectory(), "input.txt");
+        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+            String aLine;
+            while ((aLine = reader.readLine()) != null) {
+                getWords(aLine).forEach(aWord -> {
+                    int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
+                    myTokens[myServerIndex].append(aWord).append(" ").append(1).append("\n");
+                });
             }
-
         } catch (Exception aE) {
             aE.printStackTrace();
         }
