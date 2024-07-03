@@ -214,7 +214,7 @@ public class CustomServer {
             }
         }
         SocketUtils.write(aClientSocket, "shuffle 2 done");
-        System.out.println("Shuffle 2 done");
+        System.out.println("Shuff::le 2 done");
     }
 
     private void reducePhase2(Socket aClientSocket, StringBuilder[] aTokensList, String[] aServerNames) {
