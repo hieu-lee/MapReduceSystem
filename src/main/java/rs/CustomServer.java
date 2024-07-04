@@ -22,7 +22,7 @@ public class CustomServer {
     private CustomFTPClient[] theMapFTPClients;
     private CustomFTPClient[] theReduceFTPClients;
     private int theIndex;
-    private static final int FIFTY_MB = 1024 * 1024 * 50;
+    private static final int TEN_MB = 1024 * 1024 * 10;
 
     public static void main(String[] args) {
         CustomFTPServer myCustomFTPServer = new CustomFTPServer(CustomFTPCredential.getInstance());
@@ -52,10 +52,10 @@ public class CustomServer {
     private boolean hasEnoughMemory(StringBuilder[] aTokensList) {
         long myPotentialMemory = Arrays.stream(aTokensList)
                 .filter(aStringBuilder -> aStringBuilder != aTokensList[theIndex])
-                .mapToInt(StringBuilder::length)
+                .mapToInt(aStringBuilder -> aStringBuilder.length() * 2 + 20)
                 .max()
                 .orElse(0);
-        return Runtime.getRuntime().freeMemory() + myPotentialMemory > FIFTY_MB;
+        return Runtime.getRuntime().freeMemory() + myPotentialMemory > TEN_MB;
     }
 
 
