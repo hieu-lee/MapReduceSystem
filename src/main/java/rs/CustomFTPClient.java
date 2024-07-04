@@ -50,6 +50,18 @@ public class CustomFTPClient {
         this(aFilename, aFileContent, aServer, aCredential, CustomFTPClientType.STORE);
     }
 
+    public CustomFTPClient(String aFilename, String aServer, CustomFTPCredential aCredential) {
+        theFilename = aFilename;
+        theFileContent = null;
+        theServer = aServer;
+        thePort = aCredential.getPort();
+        theUsername = aCredential.getUsername();
+        thePassword = aCredential.getPassword();
+        theFtpClient = new FTPClient();
+        theCustomFTPClientType = CustomFTPClientType.MASTER;
+        thePath = null;
+    }
+
     private boolean filenameExisted() {
         try {
             FTPFile[] myFiles = theFtpClient.listFiles();
@@ -65,6 +77,29 @@ public class CustomFTPClient {
         catch (IOException aE) {
             aE.printStackTrace();
             return false;
+        }
+    }
+
+    public void storeFile(String aFileContent) {
+        try (InputStream myInputStream = new ByteArrayInputStream(aFileContent.getBytes())) {
+            theFtpClient.storeFile(theFilename, myInputStream);
+        }
+        catch (IOException aE) {
+            aE.printStackTrace();
+        }
+        int myErrorCode = theFtpClient.getReplyCode();
+        if (myErrorCode != 226) {
+            System.out.println("File upload failed. FTP Error code: " + myErrorCode);
+        }
+    }
+
+    public void appendFile(String aFileContent) {
+        try (InputStream myInputStream = new ByteArrayInputStream(aFileContent.getBytes())) {
+            if (!theFtpClient.appendFile(theFilename, myInputStream)) {
+                System.err.println("Failed to append file.");
+            }
+        } catch (IOException aE) {
+            aE.printStackTrace();
         }
     }
 
@@ -90,10 +125,9 @@ public class CustomFTPClient {
         } else {
             System.out.println("File uploaded successfully.");
         }
-
     }
 
-    private void setUpClient() {
+    public void setUpClient() {
         try {
             theFtpClient.connect(theServer, thePort);
             theFtpClient.login(theUsername, thePassword);
@@ -142,7 +176,7 @@ public class CustomFTPClient {
         }
     }
 
-    private void logoutAndDisconnect() {
+    public void logoutAndDisconnect() {
         try {
             theFtpClient.logout();
             theFtpClient.disconnect();
@@ -211,6 +245,8 @@ public class CustomFTPClient {
             case DELETE:
                 clientDeleteFile();
                 break;
+            default:
+                System.err.println("Invalid FTP client type.");
         }
     }
 }

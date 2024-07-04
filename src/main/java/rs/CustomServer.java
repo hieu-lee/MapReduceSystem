@@ -14,12 +14,13 @@ import java.util.stream.Stream;
 
 public class CustomServer {
     private final CustomFTPServer theCustomFTPServer;
-    private final CustomFTPServerTask theCustomFTPServerTask;
     private ServerSocket theServerSocket;
     private static final String THE_MAP_FILE_SUFFIX = "_map.txt";
     private static final String THE_REDUCE_FILE_SUFFIX = "_reduce.txt";
     private int theNumberOfServers;
     private String theServerName;
+    private CustomFTPClient[] theMapFTPClients;
+    private CustomFTPClient[] theReduceFTPClients;
 
     public static void main(String[] args) {
         CustomFTPServer myCustomFTPServer = new CustomFTPServer(CustomFTPCredential.getInstance());
@@ -29,7 +30,7 @@ public class CustomServer {
 
     public CustomServer(CustomFTPServer aCustomFTPServer) {
         theCustomFTPServer = aCustomFTPServer;
-        theCustomFTPServerTask = new CustomFTPServerTask(theCustomFTPServer);
+        CustomFTPServerTask theCustomFTPServerTask = new CustomFTPServerTask(theCustomFTPServer);
         try {
             theServerSocket = new ServerSocket(SocketUtils.PORT);
         } catch (Exception aE) {
@@ -78,6 +79,16 @@ public class CustomServer {
         } catch (FileNotFoundException aE) {
             aE.printStackTrace();
         }
+        theMapFTPClients = new CustomFTPClient[theNumberOfServers];
+        theReduceFTPClients = new CustomFTPClient[theNumberOfServers];
+        for (int i = 0; i < theNumberOfServers; i++) {
+            if (!myServers[i].equals(theServerName)) {
+                theMapFTPClients[i] = new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, myServers[i], CustomFTPCredential.getInstance());
+                theMapFTPClients[i].setUpClient();
+                theReduceFTPClients[i] = new CustomFTPClient(theServerName + THE_REDUCE_FILE_SUFFIX, myServers[i], CustomFTPCredential.getInstance());
+                theReduceFTPClients[i].setUpClient();
+            }
+        }
         return myServers;
     }
 
@@ -112,7 +123,7 @@ public class CustomServer {
                         myTokens.append(aWord).append(" ").append(1).append("\n");
                     }
                     else {
-                        new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, aWord + " 1\n", aServers[myServerIndex], CustomFTPCredential.getInstance(), CustomFTPClientType.APPEND).run();
+                        theMapFTPClients[myServerIndex].appendFile(aWord + " 1\n");
                     }
                 });
             }
@@ -120,50 +131,55 @@ public class CustomServer {
             aE.printStackTrace();
         }
         SocketUtils.write(aClientSocket, "map and shuffle 1 done");
+        for (CustomFTPClient aFtpClient : theMapFTPClients) {
+            if (aFtpClient != null) {
+                aFtpClient.logoutAndDisconnect();
+            }
+        }
         System.out.println("map and shuffle 1 done");
         return myTokens;
     }
 
-    private StringBuilder[] mapPhase1() {
-        StringBuilder[] myTokens = new StringBuilder[theNumberOfServers];
-        for (int i = 0; i < theNumberOfServers; i++) {
-            myTokens[i] = new StringBuilder();
-        }
-        Path filePath = Paths.get(theCustomFTPServer.getHomeDirectory(), "input.txt");
-        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-            String aLine;
-            while ((aLine = reader.readLine()) != null) {
-                getWords(aLine).forEach(aWord -> {
-                    int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
-                    myTokens[myServerIndex].append(aWord).append(" ").append(1).append("\n");
-                });
-            }
-        } catch (Exception aE) {
-            aE.printStackTrace();
-        }
-        return myTokens;
-    }
-
-    private void shufflePhase1(String[] aServers, StringBuilder[] aTokens, Socket aClientSocket) {
-        CustomFTPClientTask[] myClients = new CustomFTPClientTask[theNumberOfServers];
-        for (int i = 0; i < theNumberOfServers; i++) {
-            if (!theServerName.equals(aServers[i])) {
-                myClients[i] = new CustomFTPClientTask(new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, aTokens[i].toString(), aServers[i], CustomFTPCredential.getInstance()));
-                myClients[i].start();
-            }
-        }
-        for (int i = 0; i < theNumberOfServers; i++) {
-            if (!theServerName.equals(aServers[i])) {
-                try {
-                    myClients[i].join();
-                } catch (InterruptedException aE) {
-                    aE.printStackTrace();
-                }
-            }
-        }
-        SocketUtils.write(aClientSocket, "map and shuffle 1 done");
-        System.out.println("map and shuffle 1 done");
-    }
+//    private StringBuilder[] mapPhase1() {
+//        StringBuilder[] myTokens = new StringBuilder[theNumberOfServers];
+//        for (int i = 0; i < theNumberOfServers; i++) {
+//            myTokens[i] = new StringBuilder();
+//        }
+//        Path filePath = Paths.get(theCustomFTPServer.getHomeDirectory(), "input.txt");
+//        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+//            String aLine;
+//            while ((aLine = reader.readLine()) != null) {
+//                getWords(aLine).forEach(aWord -> {
+//                    int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
+//                    myTokens[myServerIndex].append(aWord).append(" ").append(1).append("\n");
+//                });
+//            }
+//        } catch (Exception aE) {
+//            aE.printStackTrace();
+//        }
+//        return myTokens;
+//    }
+//
+//    private void shufflePhase1(String[] aServers, StringBuilder[] aTokens, Socket aClientSocket) {
+//        CustomFTPClientTask[] myClients = new CustomFTPClientTask[theNumberOfServers];
+//        for (int i = 0; i < theNumberOfServers; i++) {
+//            if (!theServerName.equals(aServers[i])) {
+//                myClients[i] = new CustomFTPClientTask(new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, aTokens[i].toString(), aServers[i], CustomFTPCredential.getInstance()));
+//                myClients[i].start();
+//            }
+//        }
+//        for (int i = 0; i < theNumberOfServers; i++) {
+//            if (!theServerName.equals(aServers[i])) {
+//                try {
+//                    myClients[i].join();
+//                } catch (InterruptedException aE) {
+//                    aE.printStackTrace();
+//                }
+//            }
+//        }
+//        SocketUtils.write(aClientSocket, "map and shuffle 1 done");
+//        System.out.println("map and shuffle 1 done");
+//    }
 
     private Map<String, Integer> reducePhase1(Socket aClientSocket, String[] aServers, StringBuilder aTokens) {
         if (SocketUtils.read(aClientSocket).equals("reduce 1 start")) {
@@ -227,16 +243,36 @@ public class CustomServer {
         return myServerIndex;
     }
 
-    private StringBuilder shufflePhase2(Map<String, Integer> aWordCounts, String[] aServerNames, Socket aClientSocket, int[] aBoundaries) {
+    private StringBuilder shufflePhase2(Map<String, Integer> aWordCounts, String[] aServers, Socket aClientSocket, int[] aBoundaries) {
         StringBuilder myTokens = new StringBuilder();
+
+        CustomFTPClientTask[] myClientTasks = new CustomFTPClientTask[theNumberOfServers];
+        for (int i = 0; i < theNumberOfServers; i++) {
+            if (!theServerName.equals(aServers[i])) {
+                myClientTasks[i] = new CustomFTPClientTask(new CustomFTPClient(theServerName + THE_REDUCE_FILE_SUFFIX, "", aServers[i], CustomFTPCredential.getInstance(), CustomFTPClientType.DELETE));
+                myClientTasks[i].start();
+            }
+            else {
+                myClientTasks[i] = null;
+            }
+        }
+        for (int i = 0; i < theNumberOfServers; i++) {
+            if (myClientTasks[i] != null) {
+                try {
+                    myClientTasks[i].join();
+                } catch (InterruptedException aE) {
+                    aE.printStackTrace();
+                }
+            }
+        }
 
         for (Map.Entry<String, Integer> aEntry: aWordCounts.entrySet()) {
             int myServerIndex = getServerIndex(aEntry.getValue(), aBoundaries);
-            if (theServerName.equals(aServerNames[myServerIndex])) {
+            if (theServerName.equals(aServers[myServerIndex])) {
                 myTokens.append(aEntry.getKey()).append(" ").append(aEntry.getValue()).append("\n");
             }
             else {
-                new CustomFTPClient(theServerName + THE_REDUCE_FILE_SUFFIX, aEntry.getKey() + " " + aEntry.getValue() + "\n", aServerNames[myServerIndex], CustomFTPCredential.getInstance(), CustomFTPClientType.APPEND).run();
+                theReduceFTPClients[myServerIndex].appendFile(aEntry.getKey() + " " + aEntry.getValue() + "\n");
             }
         }
         SocketUtils.write(aClientSocket, "shuffle 2 done");
@@ -291,6 +327,11 @@ public class CustomServer {
                         }
                     });
             SocketUtils.write(aClientSocket, "reduce 2 done");
+            for (CustomFTPClient aFTPClient : theReduceFTPClients) {
+                if (aFTPClient != null) {
+                    aFTPClient.logoutAndDisconnect();
+                }
+            }
             System.out.println("Reduce 2 done");
         } catch (IOException aE) {
             aE.printStackTrace();
