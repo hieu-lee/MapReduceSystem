@@ -343,14 +343,14 @@ public class CustomServer {
                                             .flatMap(aLine -> Arrays.stream(aLine.split("\n")))
                                             .filter(aWord -> !aWord.isEmpty())
                                             .map(aWord -> {
-                                                String[] myParts = aWord.split(" ");
-                                                return new AbstractMap.SimpleEntry<>(Integer.parseInt(myParts[1]), myParts[0]);
+                                                String[] aToken = aWord.split(" ");
+                                                return new AbstractMap.SimpleEntry<>(Integer.parseInt(aToken[1]), aToken[0]);
                                             })
                                     : Arrays.stream(aTokens.toString().split("\n"))
                                     .filter(aWord -> !aWord.isEmpty())
                                     .map(aWord -> {
                                         String[] aToken = aWord.split(" ");
-                                        return new AbstractMap.SimpleEntry<>(Integer.parseInt(aToken[0]), aToken[1]);
+                                        return new AbstractMap.SimpleEntry<>(Integer.parseInt(aToken[1]), aToken[0]);
                                     });
                         } catch (IOException aE) {
                             aE.printStackTrace();
