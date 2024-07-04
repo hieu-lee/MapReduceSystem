@@ -1,6 +1,8 @@
 rs\CustomFTPClientType.class
 rs\CustomFTPCredential.class
+rs\CustomFTPServerTask.class
 rs\CustomClient.class
+rs\CustomFTPClientTask.class
 rs\FreqCount.class
 rs\CustomFTPServer.class
 rs\CustomFTPClient.class

@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 
 public class CustomServer {
     private final CustomFTPServer theCustomFTPServer;
+    private final CustomFTPServerTask theCustomFTPServerTask;
     private ServerSocket theServerSocket;
     private static final String THE_MAP_FILE_SUFFIX = "_map.txt";
     private static final String THE_REDUCE_FILE_SUFFIX = "_reduce.txt";
@@ -28,6 +29,7 @@ public class CustomServer {
 
     public CustomServer(CustomFTPServer aCustomFTPServer) {
         theCustomFTPServer = aCustomFTPServer;
+        theCustomFTPServerTask = new CustomFTPServerTask(theCustomFTPServer);
         try {
             theServerSocket = new ServerSocket(SocketUtils.PORT);
         } catch (Exception aE) {
@@ -35,7 +37,7 @@ public class CustomServer {
         }
 
         System.out.println("Socket server started on port " + SocketUtils.PORT);
-        theCustomFTPServer.start();
+        theCustomFTPServerTask.start();
     }
 
     private Stream<String> getWords(String aLine) {
@@ -79,6 +81,49 @@ public class CustomServer {
         return myServers;
     }
 
+    private StringBuilder mapAndShufflePhase1(String[] aServers, Socket aClientSocket) {
+        StringBuilder myTokens = new StringBuilder();
+        Path filePath = Paths.get(theCustomFTPServer.getHomeDirectory(), "input.txt");
+        CustomFTPClientTask[] myClientTasks = new CustomFTPClientTask[theNumberOfServers];
+        for (int i = 0; i < theNumberOfServers; i++) {
+            if (!theServerName.equals(aServers[i])) {
+                myClientTasks[i] = new CustomFTPClientTask(new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, "", aServers[i], CustomFTPCredential.getInstance(), CustomFTPClientType.DELETE));
+                myClientTasks[i].start();
+            }
+            else {
+                myClientTasks[i] = null;
+            }
+        }
+        for (int i = 0; i < theNumberOfServers; i++) {
+            if (myClientTasks[i] != null) {
+                try {
+                    myClientTasks[i].join();
+                } catch (InterruptedException aE) {
+                    aE.printStackTrace();
+                }
+            }
+        }
+        try (BufferedReader myReader = Files.newBufferedReader(filePath)) {
+            String myLine;
+            while ((myLine = myReader.readLine()) != null) {
+                getWords(myLine).forEach(aWord -> {
+                    int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
+                    if (theServerName.equals(aServers[myServerIndex])) {
+                        myTokens.append(aWord).append(" ").append(1).append("\n");
+                    }
+                    else {
+                        new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, aWord + " 1\n", aServers[myServerIndex], CustomFTPCredential.getInstance(), CustomFTPClientType.APPEND).run();
+                    }
+                });
+            }
+        } catch (Exception aE) {
+            aE.printStackTrace();
+        }
+        SocketUtils.write(aClientSocket, "map and shuffle 1 done");
+        System.out.println("map and shuffle 1 done");
+        return myTokens;
+    }
+
     private StringBuilder[] mapPhase1() {
         StringBuilder[] myTokens = new StringBuilder[theNumberOfServers];
         for (int i = 0; i < theNumberOfServers; i++) {
@@ -100,10 +145,10 @@ public class CustomServer {
     }
 
     private void shufflePhase1(String[] aServers, StringBuilder[] aTokens, Socket aClientSocket) {
-        CustomFTPClient[] myClients = new CustomFTPClient[theNumberOfServers];
+        CustomFTPClientTask[] myClients = new CustomFTPClientTask[theNumberOfServers];
         for (int i = 0; i < theNumberOfServers; i++) {
             if (!theServerName.equals(aServers[i])) {
-                myClients[i] = new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, aTokens[i].toString(), aServers[i], CustomFTPCredential.getInstance());
+                myClients[i] = new CustomFTPClientTask(new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, aTokens[i].toString(), aServers[i], CustomFTPCredential.getInstance()));
                 myClients[i].start();
             }
         }
@@ -120,7 +165,7 @@ public class CustomServer {
         System.out.println("map and shuffle 1 done");
     }
 
-    private Map<String, Integer> reducePhase1(Socket aClientSocket, String[] aServers, StringBuilder[] aTokensList) {
+    private Map<String, Integer> reducePhase1(Socket aClientSocket, String[] aServers, StringBuilder aTokens) {
         if (SocketUtils.read(aClientSocket).equals("reduce 1 start")) {
             System.out.println("Start reduce phase 1");
         }
@@ -138,10 +183,10 @@ public class CustomServer {
         IntStream.range(0, theNumberOfServers)
                 .mapToObj(i -> !theServerName.equals(aServers[i])
                         ? readLinesFromFile(theCustomFTPServer.getHomeDirectory(), aServers[i])
-                        : Arrays.stream(aTokensList[i].toString().split("\n")))
+                        : Arrays.stream(aTokens.toString().split("\n")))
                 .flatMap(Function.identity())
                 .filter(aLine -> !aLine.isEmpty())
-                .map(aLine -> aLine.split(" ")).forEach(aTokens -> myWordCounts.put(aTokens[0], myWordCounts.getOrDefault(aTokens[0], 0) + Integer.parseInt(aTokens[1])));
+                .map(aLine -> aLine.split(" ")).forEach(aToken -> myWordCounts.put(aToken[0], myWordCounts.getOrDefault(aToken[0], 0) + Integer.parseInt(aToken[1])));
         return myWordCounts;
     }
 
@@ -182,39 +227,24 @@ public class CustomServer {
         return myServerIndex;
     }
 
-    private void shufflePhase2(Map<String, Integer> aWordCounts, String[] aServerNames, Socket aClientSocket, int[] aBoundaries, StringBuilder[] aTokensList) {
-        CustomFTPClient[] myClients = new CustomFTPClient[theNumberOfServers];
-
-        for (int i = 0; i < theNumberOfServers; i++) {
-            aTokensList[i] = new StringBuilder();
-        }
+    private StringBuilder shufflePhase2(Map<String, Integer> aWordCounts, String[] aServerNames, Socket aClientSocket, int[] aBoundaries) {
+        StringBuilder myTokens = new StringBuilder();
 
         for (Map.Entry<String, Integer> aEntry: aWordCounts.entrySet()) {
             int myServerIndex = getServerIndex(aEntry.getValue(), aBoundaries);
-            aTokensList[myServerIndex].append(aEntry.getValue()).append(" ").append(aEntry.getKey()).append("\n");
-        }
-
-        for (int i = 0; i < theNumberOfServers; i++) {
-            if (!theServerName.equals(aServerNames[i])) {
-                myClients[i] = new CustomFTPClient(theServerName + THE_REDUCE_FILE_SUFFIX, aTokensList[i].toString(), aServerNames[i], CustomFTPCredential.getInstance());
-                myClients[i].start();
+            if (theServerName.equals(aServerNames[myServerIndex])) {
+                myTokens.append(aEntry.getKey()).append(" ").append(aEntry.getValue()).append("\n");
             }
-        }
-
-        for (int i = 0; i < theNumberOfServers; i++) {
-            if (!theServerName.equals(aServerNames[i])) {
-                try {
-                    myClients[i].join();
-                } catch (InterruptedException aE) {
-                    aE.printStackTrace();
-                }
+            else {
+                new CustomFTPClient(theServerName + THE_REDUCE_FILE_SUFFIX, aEntry.getKey() + " " + aEntry.getValue() + "\n", aServerNames[myServerIndex], CustomFTPCredential.getInstance(), CustomFTPClientType.APPEND).run();
             }
         }
         SocketUtils.write(aClientSocket, "shuffle 2 done");
         System.out.println("Shuffle 2 done");
+        return myTokens;
     }
 
-    private void reducePhase2(Socket aClientSocket, StringBuilder[] aTokensList, String[] aServerNames) {
+    private void reducePhase2(Socket aClientSocket, StringBuilder aTokens, String[] aServerNames) {
         if (SocketUtils.read(aClientSocket).equals("reduce 2 start")) {
             System.out.println("Start reduce phase 2");
         } else {
@@ -238,11 +268,11 @@ public class CustomServer {
                                                 String[] tokens = aWord.split(" ");
                                                 return new AbstractMap.SimpleEntry<>(Integer.parseInt(tokens[0]), tokens[1]);
                                             })
-                                    : Arrays.stream(aTokensList[i].toString().split("\n"))
+                                    : Arrays.stream(aTokens.toString().split("\n"))
                                     .filter(aWord -> !aWord.isEmpty())
                                     .map(aWord -> {
-                                        String[] aTokens = aWord.split(" ");
-                                        return new AbstractMap.SimpleEntry<>(Integer.parseInt(aTokens[0]), aTokens[1]);
+                                        String[] aToken = aWord.split(" ");
+                                        return new AbstractMap.SimpleEntry<>(Integer.parseInt(aToken[0]), aToken[1]);
                                     });
                         } catch (IOException aE) {
                             aE.printStackTrace();
@@ -288,15 +318,17 @@ public class CustomServer {
 
         String[] myServers = getServerNames();
 
-        StringBuilder[] myTokensList = mapPhase1();
+//        StringBuilder[] myTokensList = mapPhase1();
+//
+//        shufflePhase1(myServers, myTokensList, myClientSocket);
 
-        shufflePhase1(myServers, myTokensList, myClientSocket);
+        StringBuilder myTokens = mapAndShufflePhase1(myServers, myClientSocket);
 
-        Map<String, Integer> myWordCounts = reducePhase1(myClientSocket, myServers, myTokensList);
+        Map<String, Integer> myWordCounts = reducePhase1(myClientSocket, myServers, myTokens);
 
-        shufflePhase2(myWordCounts, myServers, myClientSocket, getBoundaries(myWordCounts, myClientSocket), myTokensList);
+        myTokens = shufflePhase2(myWordCounts, myServers, myClientSocket, getBoundaries(myWordCounts, myClientSocket));
 
-        reducePhase2(myClientSocket, myTokensList, myServers);
+        reducePhase2(myClientSocket, myTokens, myServers);
 
         try {
             assert myClientSocket != null;

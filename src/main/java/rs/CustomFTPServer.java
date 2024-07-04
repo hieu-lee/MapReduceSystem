@@ -16,21 +16,18 @@ import org.apache.ftpserver.usermanager.impl.BaseUser;
 import org.apache.ftpserver.usermanager.impl.WritePermission;
 import org.apache.log4j.PropertyConfigurator;
 
-public class CustomFTPServer extends Thread {
+public class CustomFTPServer {
     private final FtpServer theFtpServer;
-    private final FtpServerFactory theFtpServerFactory;
-    private final ListenerFactory theListenerFactory;
     private final String theHomeDirectory;
     private final int thePort;
 
     public CustomFTPServer(CustomFTPCredential aFtpCredential) {
-        super();
         PropertyConfigurator.configure(CustomFTPServer.class.getResource("/log4J.properties"));
-        theFtpServerFactory = new FtpServerFactory();
+        FtpServerFactory myFtpServerFactory = new FtpServerFactory();
         thePort = aFtpCredential.getPort();
-        theListenerFactory = new ListenerFactory();
-        theListenerFactory.setPort(thePort);
-        theFtpServerFactory.addListener("default", theListenerFactory.createListener());
+        ListenerFactory myListenerFactory = new ListenerFactory();
+        myListenerFactory.setPort(thePort);
+        myFtpServerFactory.addListener("default", myListenerFactory.createListener());
 
         // Create a UserManager instance
         PropertiesUserManagerFactory userManagerFactory = new PropertiesUserManagerFactory();
@@ -80,9 +77,9 @@ public class CustomFTPServer extends Thread {
             e.printStackTrace();
         }
         // Set the user manager on the server context
-        theFtpServerFactory.setUserManager(myUserManager);
+        myFtpServerFactory.setUserManager(myUserManager);
 
-        theFtpServer = theFtpServerFactory.createServer();
+        theFtpServer = myFtpServerFactory.createServer();
     }
 
     public String getHomeDirectory() {

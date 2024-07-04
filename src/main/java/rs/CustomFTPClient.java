@@ -11,7 +11,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.stream.Collectors;
 
-public class CustomFTPClient extends Thread {
+public class CustomFTPClient {
     private final String theFilename;
     private final String theFileContent;
     private final String theServer;
@@ -20,9 +20,9 @@ public class CustomFTPClient extends Thread {
     private final String thePassword;
     private final FTPClient theFtpClient;
     private final CustomFTPClientType theCustomFTPClientType;
+    private final Path thePath;
 
     public CustomFTPClient(String aFilename, String aFileContent, String aServer, CustomFTPCredential aCredential, CustomFTPClientType aCustomFTPClientType) {
-        super();
         theCustomFTPClientType = aCustomFTPClientType;
         theFilename = aFilename;
         theFileContent = aFileContent;
@@ -31,6 +31,19 @@ public class CustomFTPClient extends Thread {
         theUsername = aCredential.getUsername();
         thePassword = aCredential.getPassword();
         theFtpClient = new FTPClient();
+        thePath = null;
+    }
+
+    public CustomFTPClient(String aFilename, Path aPath, String aServer, CustomFTPCredential aCredential, CustomFTPClientType aCustomFTPClientType) {
+        theCustomFTPClientType = aCustomFTPClientType;
+        theFilename = aFilename;
+        theFileContent = null;
+        theServer = aServer;
+        thePort = aCredential.getPort();
+        theUsername = aCredential.getUsername();
+        thePassword = aCredential.getPassword();
+        theFtpClient = new FTPClient();
+        thePath = aPath;
     }
 
     public CustomFTPClient(String aFilename, String aFileContent, String aServer, CustomFTPCredential aCredential) {
@@ -56,19 +69,28 @@ public class CustomFTPClient extends Thread {
     }
 
     private void storeFile() {
-        try {
-            ByteArrayInputStream myInputStream = new ByteArrayInputStream(theFileContent.getBytes());
-            theFtpClient.storeFile(theFilename, myInputStream);
-            int myErrorCode = theFtpClient.getReplyCode();
-            if (myErrorCode != 226) {
-                System.out.println("File upload failed. FTP Error code: " + myErrorCode);
-            } else {
-                System.out.println("File uploaded successfully.");
+        if (thePath == null) {
+            try (InputStream myInputStream = new ByteArrayInputStream(theFileContent.getBytes())) {
+                theFtpClient.storeFile(theFilename, myInputStream);
+            }
+            catch (IOException aE) {
+                aE.printStackTrace();
+            }
+        } else {
+            try (InputStream myInputStream = Files.newInputStream(thePath)) {
+                theFtpClient.storeFile(theFilename, myInputStream);
+            }
+            catch (IOException aE) {
+                aE.printStackTrace();
             }
         }
-        catch (IOException aE) {
-            aE.printStackTrace();
+        int myErrorCode = theFtpClient.getReplyCode();
+        if (myErrorCode != 226) {
+            System.out.println("File upload failed. FTP Error code: " + myErrorCode);
+        } else {
+            System.out.println("File uploaded successfully.");
         }
+
     }
 
     private void setUpClient() {
@@ -96,14 +118,27 @@ public class CustomFTPClient extends Thread {
     }
 
     private void appendFileContent() {
-        try (FileInputStream myInputStream = new FileInputStream(theFileContent)) {
-            if (theFtpClient.appendFile(theFilename, myInputStream)) {
-                System.out.println("File appended successfully!");
-            } else {
-                System.err.println("Failed to append file.");
+        if (thePath != null) {
+            try (InputStream myInputStream = Files.newInputStream(thePath)) {
+                if (theFtpClient.appendFile(theFilename, myInputStream)) {
+                    System.out.println("File appended successfully!");
+                } else {
+                    System.err.println("Failed to append file.");
+                }
+            } catch (IOException aE) {
+                aE.printStackTrace();
             }
-        } catch (IOException aE) {
-            aE.printStackTrace();
+        }
+        else {
+            try (InputStream myInputStream = new ByteArrayInputStream(theFileContent.getBytes())) {
+                if (theFtpClient.appendFile(theFilename, myInputStream)) {
+                    System.out.println("File appended successfully!");
+                } else {
+                    System.err.println("Failed to append file.");
+                }
+            } catch (IOException aE) {
+                aE.printStackTrace();
+            }
         }
     }
 
@@ -152,8 +187,13 @@ public class CustomFTPClient extends Thread {
 
     private void clientAppendFile() {
         setUpClient();
-        deleteFileIfExist();
         appendFileContent();
+        logoutAndDisconnect();
+    }
+
+    private void clientDeleteFile() {
+        setUpClient();
+        deleteFileIfExist();
         logoutAndDisconnect();
     }
 
@@ -167,6 +207,9 @@ public class CustomFTPClient extends Thread {
                 break;
             case DISPLAY:
                 clientDisplayFile();
+                break;
+            case DELETE:
+                clientDeleteFile();
                 break;
         }
     }

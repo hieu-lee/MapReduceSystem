@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
@@ -86,9 +87,9 @@ public class CustomClient {
             }
         }
 
-        CustomFTPClient[] theFTPClients = new CustomFTPClient[theNumberOfServers];
+        CustomFTPClientTask[] theFTPClients = new CustomFTPClientTask[theNumberOfServers];
         for (int i = 0; i < theNumberOfServers; i++) {
-            theFTPClients[i] = new CustomFTPClient("input.txt", "input" + i + ".txt", theMachinesList.get(i), CustomFTPCredential.getInstance(), CustomFTPClientType.APPEND);
+            theFTPClients[i] = new CustomFTPClientTask(new CustomFTPClient("input.txt", Paths.get("input" + i + ".txt"), theMachinesList.get(i), CustomFTPCredential.getInstance(), CustomFTPClientType.STORE));
             theFTPClients[i].start();
         }
         for (int i = 0; i < theNumberOfServers; i++) {
@@ -109,11 +110,11 @@ public class CustomClient {
     }
 
     private void publishServerNames() {
-        CustomFTPClient[] theServerNamesFTPClients = new CustomFTPClient[theNumberOfServers];
+        CustomFTPClientTask[] theServerNamesFTPClients = new CustomFTPClientTask[theNumberOfServers];
         String myServerNames = String.join("\n", theMachinesList);
         for (int i = 0; i < theNumberOfServers; i++) {
             String theServerName = theMachinesList.get(i).trim();
-            theServerNamesFTPClients[i] = new CustomFTPClient("machines.txt", myServerNames, theServerName, CustomFTPCredential.getInstance());
+            theServerNamesFTPClients[i] = new CustomFTPClientTask(new CustomFTPClient("machines.txt", myServerNames, theServerName, CustomFTPCredential.getInstance()));
             theServerNamesFTPClients[i].start();
         }
         for (int i = 0; i < theNumberOfServers; i++) {
