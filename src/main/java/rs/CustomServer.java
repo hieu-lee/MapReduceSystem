@@ -344,14 +344,12 @@ public class CustomServer {
                                             .filter(aWord -> !aWord.isEmpty())
                                             .map(aWord -> {
                                                 String[] aToken = aWord.split(" ");
-                                                System.out.println(aWord);
                                                 return new AbstractMap.SimpleEntry<>(Integer.parseInt(aToken[1]), aToken[0]);
                                             })
                                     : Arrays.stream(aTokens.toString().split("\n"))
                                     .filter(aWord -> !aWord.isEmpty())
                                     .map(aWord -> {
                                         String[] aToken = aWord.split(" ");
-                                        System.out.println(aWord);
                                         return new AbstractMap.SimpleEntry<>(Integer.parseInt(aToken[1]), aToken[0]);
                                     });
                         } catch (IOException aE) {
