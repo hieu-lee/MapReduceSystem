@@ -126,11 +126,9 @@ public class CustomServer {
                 getWords(myLine).forEach(aWord -> {
                     int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
                     myTokensList[myServerIndex].append(aWord).append(" ").append(1).append("\n");
-                    if (!theServerName.equals(aServers[myServerIndex])) {
-                        if (myTokensList[myServerIndex].length() > THE_MAX_TOKENS_SIZE) {
-                            theMapFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex].toString());
-                            myTokensList[myServerIndex] = new StringBuilder();
-                        }
+                    if (!theServerName.equals(aServers[myServerIndex]) && myTokensList[myServerIndex].length() > THE_MAX_TOKENS_SIZE) {
+                        theMapFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex].toString());
+                        myTokensList[myServerIndex] = new StringBuilder();
                     }
                 });
             }
@@ -298,11 +296,9 @@ public class CustomServer {
         for (Map.Entry<String, Integer> aEntry: aWordCounts.entrySet()) {
             int myServerIndex = getServerIndex(aEntry.getValue(), aBoundaries);
             myTokensList[myServerIndex].append(aEntry.getKey()).append(" ").append(aEntry.getValue()).append("\n");
-            if (!theServerName.equals(aServers[myServerIndex])) {
-                if (myTokensList[myServerIndex].length() > THE_MAX_TOKENS_SIZE) {
-                    theReduceFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex].toString());
-                    myTokensList[myServerIndex] = new StringBuilder();
-                }
+            if (!theServerName.equals(aServers[myServerIndex]) && myTokensList[myServerIndex].length() > THE_MAX_TOKENS_SIZE) {
+                theReduceFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex].toString());
+                myTokensList[myServerIndex] = new StringBuilder();
             }
         }
         List<Thread> myThreads = new ArrayList<>();
@@ -414,6 +410,8 @@ public class CustomServer {
         Map<String, Integer> myWordCounts = reducePhase1(myClientSocket, myServers, myTokens);
 
         myTokens = shufflePhase2(myWordCounts, myServers, myClientSocket, getBoundaries(myWordCounts, myClientSocket));
+
+        System.out.println(myTokens.toString());
 
         reducePhase2(myClientSocket, myTokens, myServers);
 
