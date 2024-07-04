@@ -146,7 +146,7 @@ public class CustomServer {
         for (int i = 0; i < theNumberOfServers; i++) {
             if (!theServerName.equals(aServers[i]) && myTokensList[i].length() > 0) {
                 int j = i;
-                Thread myThread = new Thread(() -> theMapFTPClients[j].appendFile(myTokensList[j]));
+                Thread myThread = new Thread(() -> theMapFTPClients[j].appendFile(myTokensList[j].toString()));
                 myThreads.add(myThread);
                 myThread.start();
             }
@@ -271,7 +271,7 @@ public class CustomServer {
         for (int i = 0; i < theNumberOfServers; i++) {
             if (!theServerName.equals(aServers[i]) && myTokensList[i].length() > 0) {
                 int j = i;
-                Thread myThread = new Thread(() -> theReduceFTPClients[j].appendFile(myTokensList[j]));
+                Thread myThread = new Thread(() -> theReduceFTPClients[j].appendFile(myTokensList[j].toString()));
                 myThreads.add(myThread);
                 myThread.start();
             }
