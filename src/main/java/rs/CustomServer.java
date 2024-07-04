@@ -23,6 +23,7 @@ public class CustomServer {
     private CustomFTPClient[] theReduceFTPClients;
     private int theIndex;
     private static final int THE_MAX_TOKENS_SIZE = 1_000_000;
+    private static final int FIFTY_MB = 1024 * 1024 * 50;
 
     public static void main(String[] args) {
         CustomFTPServer myCustomFTPServer = new CustomFTPServer(CustomFTPCredential.getInstance());
@@ -49,6 +50,9 @@ public class CustomServer {
                 .filter(word -> !word.isEmpty());
     }
 
+    private boolean hasEnoughMemory() {
+        return Runtime.getRuntime().freeMemory() > FIFTY_MB;
+    }
 
     private void getNumberOfServersAndServerName(Socket aClientSocket) {
         int myNumberOfServers = -1;
@@ -128,9 +132,15 @@ public class CustomServer {
                 getWords(myLine).forEach(aWord -> {
                     int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
                     myTokensList[myServerIndex].append(aWord).append(" ").append(1).append("\n");
-                    if (!theServerName.equals(aServers[myServerIndex]) && myTokensList[myServerIndex].length() > THE_MAX_TOKENS_SIZE) {
-                        theMapFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex].toString());
-                        myTokensList[myServerIndex] = new StringBuilder();
+                    if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
+                        int myLongestStringIndex = 0;
+                        for (int i = 1; i < theNumberOfServers; i++) {
+                            if (i != theIndex && myTokensList[i].length() > myTokensList[myLongestStringIndex].length()) {
+                                myLongestStringIndex = i;
+                            }
+                        }
+                        theMapFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex].toString());
+                        myTokensList[myLongestStringIndex] = new StringBuilder();
                     }
                 });
             }
@@ -163,47 +173,6 @@ public class CustomServer {
         System.out.println("map and shuffle 1 done");
         return myTokensList[theIndex];
     }
-
-//    private StringBuilder[] mapPhase1() {
-//        StringBuilder[] myTokens = new StringBuilder[theNumberOfServers];
-//        for (int i = 0; i < theNumberOfServers; i++) {
-//            myTokens[i] = new StringBuilder();
-//        }
-//        Path filePath = Paths.get(theCustomFTPServer.getHomeDirectory(), "input.txt");
-//        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-//            String aLine;
-//            while ((aLine = reader.readLine()) != null) {
-//                getWords(aLine).forEach(aWord -> {
-//                    int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
-//                    myTokens[myServerIndex].append(aWord).append(" ").append(1).append("\n");
-//                });
-//            }
-//        } catch (Exception aE) {
-//            aE.printStackTrace();
-//        }
-//        return myTokens;
-//    }
-//
-//    private void shufflePhase1(String[] aServers, StringBuilder[] aTokens, Socket aClientSocket) {
-//        CustomFTPClientTask[] myClients = new CustomFTPClientTask[theNumberOfServers];
-//        for (int i = 0; i < theNumberOfServers; i++) {
-//            if (!theServerName.equals(aServers[i])) {
-//                myClients[i] = new CustomFTPClientTask(new CustomFTPClient(theServerName + THE_MAP_FILE_SUFFIX, aTokens[i].toString(), aServers[i], CustomFTPCredential.getInstance()));
-//                myClients[i].start();
-//            }
-//        }
-//        for (int i = 0; i < theNumberOfServers; i++) {
-//            if (!theServerName.equals(aServers[i])) {
-//                try {
-//                    myClients[i].join();
-//                } catch (InterruptedException aE) {
-//                    aE.printStackTrace();
-//                }
-//            }
-//        }
-//        SocketUtils.write(aClientSocket, "map and shuffle 1 done");
-//        System.out.println("map and shuffle 1 done");
-//    }
 
     private Map<String, Integer> reducePhase1(Socket aClientSocket, String[] aServers, StringBuilder aTokens) {
         if (SocketUtils.read(aClientSocket).equals("reduce 1 start")) {
@@ -298,9 +267,15 @@ public class CustomServer {
         for (Map.Entry<String, Integer> aEntry: aWordCounts.entrySet()) {
             int myServerIndex = getServerIndex(aEntry.getValue(), aBoundaries);
             myTokensList[myServerIndex].append(aEntry.getKey()).append(" ").append(aEntry.getValue()).append("\n");
-            if (!theServerName.equals(aServers[myServerIndex]) && myTokensList[myServerIndex].length() > THE_MAX_TOKENS_SIZE) {
-                theReduceFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex].toString());
-                myTokensList[myServerIndex] = new StringBuilder();
+            if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
+                int myLongestStringIndex = 0;
+                for (int i = 1; i < theNumberOfServers; i++) {
+                    if (i != theIndex && myTokensList[i].length() > myTokensList[myLongestStringIndex].length()) {
+                        myLongestStringIndex = i;
+                    }
+                }
+                theReduceFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex].toString());
+                myTokensList[myLongestStringIndex] = new StringBuilder();
             }
         }
         List<Thread> myThreads = new ArrayList<>();
