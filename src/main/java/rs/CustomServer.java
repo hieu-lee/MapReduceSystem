@@ -133,10 +133,12 @@ public class CustomServer {
                     int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
                     myTokensList[myServerIndex].append(aWord).append(" ").append(1).append("\n");
                     if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
-                        int myLongestStringIndex = 0;
-                        for (int i = 1; i < theNumberOfServers; i++) {
-                            if (i != theIndex && myTokensList[i].length() > myTokensList[myLongestStringIndex].length()) {
+                        int myLongestStringIndex = -1;
+                        int myLongestStringLength = 0;
+                        for (int i = 0; i < theNumberOfServers; i++) {
+                            if (i != theIndex && myTokensList[i].length() > myLongestStringLength) {
                                 myLongestStringIndex = i;
+                                myLongestStringLength = myTokensList[i].length();
                             }
                         }
                         theMapFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex].toString());
@@ -268,10 +270,12 @@ public class CustomServer {
             int myServerIndex = getServerIndex(aEntry.getValue(), aBoundaries);
             myTokensList[myServerIndex].append(aEntry.getKey()).append(" ").append(aEntry.getValue()).append("\n");
             if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
-                int myLongestStringIndex = 0;
-                for (int i = 1; i < theNumberOfServers; i++) {
-                    if (i != theIndex && myTokensList[i].length() > myTokensList[myLongestStringIndex].length()) {
+                int myLongestStringIndex = -1;
+                int myLongestStringLength = 0;
+                for (int i = 0; i < theNumberOfServers; i++) {
+                    if (i != theIndex && myTokensList[i].length() > myLongestStringLength) {
                         myLongestStringIndex = i;
+                        myLongestStringLength = myTokensList[i].length();
                     }
                 }
                 theReduceFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex].toString());
