@@ -22,7 +22,7 @@ public class CustomServer {
     private CustomFTPClient[] theMapFTPClients;
     private CustomFTPClient[] theReduceFTPClients;
     private int theIndex;
-    private static final int MAX_FREE_BYTES = 1024 * 1024 * 100;
+    private static final int MAX_FREE_BYTES = 1024 * 1024 * 50;
 
     public static void main(String[] args) {
         CustomFTPServer myCustomFTPServer = new CustomFTPServer(CustomFTPCredential.getInstance());
@@ -52,7 +52,7 @@ public class CustomServer {
     private boolean hasEnoughMemory(StringBuilder[] aTokensList) {
         long myPotentialMemory = Arrays.stream(aTokensList)
                 .filter(aStringBuilder -> aStringBuilder != aTokensList[theIndex])
-                .mapToInt(aStringBuilder -> aStringBuilder.length() * 2 + 20)
+                .mapToInt(aStringBuilder -> aStringBuilder.length())
                 .max()
                 .orElse(0);
         return Runtime.getRuntime().freeMemory() + myPotentialMemory > MAX_FREE_BYTES;
@@ -146,7 +146,7 @@ public class CustomServer {
                                 myLongestStringLength = myTokensList[i].length();
                             }
                         }
-                        theMapFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex].toString());
+                        theMapFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex]);
                         myTokensList[myLongestStringIndex] = new StringBuilder();
                     }
                 });
@@ -283,7 +283,7 @@ public class CustomServer {
                         myLongestStringLength = myTokensList[i].length();
                     }
                 }
-                theReduceFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex].toString());
+                theReduceFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex]);
                 myTokensList[myLongestStringIndex] = new StringBuilder();
             }
         }

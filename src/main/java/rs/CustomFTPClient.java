@@ -93,8 +93,31 @@ public class CustomFTPClient {
         }
     }
 
+    public void storeFile(StringBuilder aFileContent) {
+        try (InputStream myInputStream = new StringBuilderInputStream(aFileContent)) {
+            theFtpClient.storeFile(theFilename, myInputStream);
+        }
+        catch (IOException aE) {
+            aE.printStackTrace();
+        }
+        int myErrorCode = theFtpClient.getReplyCode();
+        if (myErrorCode != 226) {
+            System.out.println("File upload failed. FTP Error code: " + myErrorCode);
+        }
+    }
+
     public void appendFile(String aFileContent) {
         try (InputStream myInputStream = new ByteArrayInputStream(aFileContent.getBytes())) {
+            if (!theFtpClient.appendFile(theFilename, myInputStream)) {
+                System.err.println("Failed to append file.");
+            }
+        } catch (IOException aE) {
+            aE.printStackTrace();
+        }
+    }
+
+    public void appendFile(StringBuilder aFileContent) {
+        try (InputStream myInputStream = new StringBuilderInputStream(aFileContent)) {
             if (!theFtpClient.appendFile(theFilename, myInputStream)) {
                 System.err.println("Failed to append file.");
             }
