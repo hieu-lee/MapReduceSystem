@@ -23,6 +23,7 @@ public class CustomServer {
     private CustomFTPClient[] theReduceFTPClients;
     private int theIndex;
     private static final int MAX_FREE_BYTES = 1024 * 1024 * 100;
+    private static final int MAX_STRING_LENGTH = 1_000_000;
 
     public static void main(String[] args) {
         CustomFTPServer myCustomFTPServer = new CustomFTPServer(CustomFTPCredential.getInstance());
@@ -132,17 +133,9 @@ public class CustomServer {
                 getWords(myLine).forEach(aWord -> {
                     int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
                     myTokensList[myServerIndex].append(aWord).append(" ").append(1).append("\n");
-                    if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
-                        int myLongestStringIndex = -1;
-                        int myLongestStringLength = 0;
-                        for (int i = 0; i < theNumberOfServers; i++) {
-                            if (i != theIndex && myTokensList[i].length() > myLongestStringLength) {
-                                myLongestStringIndex = i;
-                                myLongestStringLength = myTokensList[i].length();
-                            }
-                        }
-                        theMapFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex]);
-                        myTokensList[myLongestStringIndex] = new StringBuilder();
+                    if (myServerIndex != theIndex  && aServers[myServerIndex].length() > MAX_STRING_LENGTH) {
+                        theMapFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex]);
+                        myTokensList[myServerIndex] = new StringBuilder();
                     }
                 });
             }
@@ -153,7 +146,7 @@ public class CustomServer {
         for (int i = 0; i < theNumberOfServers; i++) {
             if (!theServerName.equals(aServers[i]) && myTokensList[i].length() > 0) {
                 int j = i;
-                Thread myThread = new Thread(() -> theMapFTPClients[j].appendFile(myTokensList[j].toString()));
+                Thread myThread = new Thread(() -> theMapFTPClients[j].appendFile(myTokensList[j]));
                 myThreads.add(myThread);
                 myThread.start();
             }
@@ -269,24 +262,16 @@ public class CustomServer {
         for (Map.Entry<String, Integer> aEntry: aWordCounts.entrySet()) {
             int myServerIndex = getServerIndex(aEntry.getValue(), aBoundaries);
             myTokensList[myServerIndex].append(aEntry.getKey()).append(" ").append(aEntry.getValue()).append("\n");
-            if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
-                int myLongestStringIndex = -1;
-                int myLongestStringLength = 0;
-                for (int i = 0; i < theNumberOfServers; i++) {
-                    if (i != theIndex && myTokensList[i].length() > myLongestStringLength) {
-                        myLongestStringIndex = i;
-                        myLongestStringLength = myTokensList[i].length();
-                    }
-                }
-                theReduceFTPClients[myLongestStringIndex].appendFile(myTokensList[myLongestStringIndex]);
-                myTokensList[myLongestStringIndex] = new StringBuilder();
+            if (myServerIndex != theIndex  && aServers[myServerIndex].length() > MAX_STRING_LENGTH) {
+                theReduceFTPClients[myServerIndex].appendFile(myTokensList[myServerIndex]);
+                myTokensList[myServerIndex] = new StringBuilder();
             }
         }
         List<Thread> myThreads = new ArrayList<>();
         for (int i = 0; i < theNumberOfServers; i++) {
             if (!theServerName.equals(aServers[i]) && myTokensList[i].length() > 0) {
                 int j = i;
-                Thread myThread = new Thread(() -> theReduceFTPClients[j].appendFile(myTokensList[j].toString()));
+                Thread myThread = new Thread(() -> theReduceFTPClients[j].appendFile(myTokensList[j]));
                 myThreads.add(myThread);
                 myThread.start();
             }
