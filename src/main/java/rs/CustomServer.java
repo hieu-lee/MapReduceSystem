@@ -343,8 +343,8 @@ public class CustomServer {
                                             .flatMap(aLine -> Arrays.stream(aLine.split("\n")))
                                             .filter(aWord -> !aWord.isEmpty())
                                             .map(aWord -> {
-                                                String[] tokens = aWord.split(" ");
-                                                return new AbstractMap.SimpleEntry<>(Integer.parseInt(tokens[0]), tokens[1]);
+                                                String[] myParts = aWord.split(" ");
+                                                return new AbstractMap.SimpleEntry<>(Integer.parseInt(myParts[1]), myParts[0]);
                                             })
                                     : Arrays.stream(aTokens.toString().split("\n"))
                                     .filter(aWord -> !aWord.isEmpty())
@@ -410,8 +410,6 @@ public class CustomServer {
         Map<String, Integer> myWordCounts = reducePhase1(myClientSocket, myServers, myTokens);
 
         myTokens = shufflePhase2(myWordCounts, myServers, myClientSocket, getBoundaries(myWordCounts, myClientSocket));
-
-        System.out.println(myTokens.toString());
 
         reducePhase2(myClientSocket, myTokens, myServers);
 
