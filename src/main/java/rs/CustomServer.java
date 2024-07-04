@@ -21,7 +21,7 @@ public class CustomServer {
     private String theServerName;
     private CustomFTPClient[] theMapFTPClients;
     private CustomFTPClient[] theReduceFTPClients;
-    private static final int THE_MAX_TOKENS_SIZE = 300_000;
+    private static final int THE_MAX_TOKENS_SIZE = 1_000_000;
 
     public static void main(String[] args) {
         CustomFTPServer myCustomFTPServer = new CustomFTPServer(CustomFTPCredential.getInstance());
