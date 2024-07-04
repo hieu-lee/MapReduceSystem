@@ -9,8 +9,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public class CustomClient {
@@ -49,65 +53,76 @@ public class CustomClient {
     }
 
     private void publishFileContents() {
+        ExecutorService myExecutorService = Executors.newFixedThreadPool(theNumberOfServers);
         BufferedWriter[] myBufferedWriters = new BufferedWriter[theNumberOfServers];
-        try {
-            for (int i = 0; i < theNumberOfServers; i++) {
-                File myInputFile = new File("input" + i + ".txt");
-                if (!myInputFile.exists()) {
-                    myInputFile.createNewFile();
-                }
-                myBufferedWriters[i] = Files.newBufferedWriter(Paths.get("input" + i + ".txt"), StandardOpenOption.APPEND);
-            }
 
+        try {
+            // Initialize BufferedWriter objects in parallel
+            IntStream.range(0, theNumberOfServers).parallel().forEach(i -> {
+                try {
+                    Path path = Paths.get("input" + i + ".txt");
+                    if (!Files.exists(path)) {
+                        Files.createFile(path);
+                    }
+                    myBufferedWriters[i] = Files.newBufferedWriter(path, StandardOpenOption.APPEND);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            // Process files in parallel
             for (String aFilename : theInputFilenames) {
                 File myFile = new File(THE_INPUT_FILES_DIRECTORY + "/" + aFilename);
                 AtomicInteger myCount = new AtomicInteger(0);
-                try (Stream<String> myLinesStream = Files.lines(myFile.toPath())) {
+                try (Stream<String> myLinesStream = Files.lines(myFile.toPath()).parallel()) {
                     myLinesStream.forEach(aLine -> {
                         int myServerIndex = myCount.getAndIncrement() % theNumberOfServers;
                         try {
                             myBufferedWriters[myServerIndex].write(aLine.toLowerCase() + "\n");
-                        } catch (IOException aE) {
-                            aE.printStackTrace();
+                        } catch (IOException e) {
+                            e.printStackTrace();
                         }
                     });
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
-        } catch (IOException aE) {
-            aE.printStackTrace();
         } finally {
-            for (int i = 0; i < theNumberOfServers; i++) {
+            // Close BufferedWriter objects
+            IntStream.range(0, theNumberOfServers).parallel().forEach(i -> {
                 try {
                     if (myBufferedWriters[i] != null) {
                         myBufferedWriters[i].close();
                     }
-                } catch (IOException aE) {
-                    aE.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-            }
+            });
         }
 
+        // FTP client tasks
         CustomFTPClientTask[] theFTPClients = new CustomFTPClientTask[theNumberOfServers];
         for (int i = 0; i < theNumberOfServers; i++) {
             theFTPClients[i] = new CustomFTPClientTask(new CustomFTPClient("input.txt", Paths.get("input" + i + ".txt"), theMachinesList.get(i), CustomFTPCredential.getInstance(), CustomFTPClientType.STORE));
-            theFTPClients[i].start();
+            myExecutorService.submit(theFTPClients[i]);
         }
-        for (int i = 0; i < theNumberOfServers; i++) {
-            try {
-                theFTPClients[i].join();
-            } catch (InterruptedException aE) {
-                aE.printStackTrace();
-            }
+        myExecutorService.shutdown();
+        try {
+            myExecutorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
-        for (int i = 0; i < theNumberOfServers; i++) {
+        // Delete files
+        IntStream.range(0, theNumberOfServers).parallel().forEach(i -> {
             try {
                 Files.deleteIfExists(Paths.get("input" + i + ".txt"));
-            } catch (IOException aE) {
-                aE.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        }
+        });
     }
+
 
     private void publishServerNames() {
         CustomFTPClientTask[] theServerNamesFTPClients = new CustomFTPClientTask[theNumberOfServers];

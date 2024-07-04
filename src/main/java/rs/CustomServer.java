@@ -22,7 +22,6 @@ public class CustomServer {
     private CustomFTPClient[] theMapFTPClients;
     private CustomFTPClient[] theReduceFTPClients;
     private int theIndex;
-    private static final int THE_MAX_TOKENS_SIZE = 1_000_000;
     private static final int FIFTY_MB = 1024 * 1024 * 50;
 
     public static void main(String[] args) {
@@ -50,9 +49,15 @@ public class CustomServer {
                 .filter(word -> !word.isEmpty());
     }
 
-    private boolean hasEnoughMemory() {
-        return Runtime.getRuntime().freeMemory() > FIFTY_MB;
+    private boolean hasEnoughMemory(StringBuilder[] aTokensList) {
+        long myPotentialMemory = Arrays.stream(aTokensList)
+                .filter(aStringBuilder -> aStringBuilder != aTokensList[theIndex])
+                .mapToInt(StringBuilder::length)
+                .max()
+                .orElse(0);
+        return Runtime.getRuntime().freeMemory() + myPotentialMemory > FIFTY_MB;
     }
+
 
     private void getNumberOfServersAndServerName(Socket aClientSocket) {
         int myNumberOfServers = -1;
@@ -132,7 +137,7 @@ public class CustomServer {
                 getWords(myLine).forEach(aWord -> {
                     int myServerIndex = Math.abs(aWord.hashCode()) % theNumberOfServers;
                     myTokensList[myServerIndex].append(aWord).append(" ").append(1).append("\n");
-                    if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
+                    if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory(myTokensList)) {
                         int myLongestStringIndex = -1;
                         int myLongestStringLength = 0;
                         for (int i = 0; i < theNumberOfServers; i++) {
@@ -269,7 +274,7 @@ public class CustomServer {
         for (Map.Entry<String, Integer> aEntry: aWordCounts.entrySet()) {
             int myServerIndex = getServerIndex(aEntry.getValue(), aBoundaries);
             myTokensList[myServerIndex].append(aEntry.getKey()).append(" ").append(aEntry.getValue()).append("\n");
-            if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory()) {
+            if (!theServerName.equals(aServers[myServerIndex]) && !hasEnoughMemory(myTokensList)) {
                 int myLongestStringIndex = -1;
                 int myLongestStringLength = 0;
                 for (int i = 0; i < theNumberOfServers; i++) {
